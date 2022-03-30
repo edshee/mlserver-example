@@ -22,4 +22,4 @@ endpoint = "http://localhost:8080/v2/models/fashion-xgboost/versions/v1/infer"
 #Make request and print response
 response = requests.post(endpoint, json=inference_request)
 print(response.text)
-print(y_test)
+print(y_test.values)
