@@ -12,7 +12,7 @@ The dataset we're going to work with is the [Fashion MNIST dataset](https://www.
 
 ## Training the Scikit-learn Model
 
-First up, we're going to train a support vector machine (SVM) model using the [scikit-learn](link) framework. We'll then save the model to a file named `Fashion-MNIST.joblib`.
+First up, we're going to train a support vector machine (SVM) model using the [scikit-learn](lhttps://scikit-learn.org/stable/) framework. We'll then save the model to a file named `Fashion-MNIST.joblib`.
 
 ```python
 import pandas as pd
@@ -37,7 +37,7 @@ print(f'Execution time: {exec_time} seconds')
 joblib.dump(classifier, "Fashion-MNIST.joblib")
 ```
 
-Note: The SVM algorithm is not particularly well suited to large datasets because of it's exponential nature. The model in this example will, depending on your hardware, take a couple of minutes to train. 
+Note: The SVM algorithm is not particularly well suited to large datasets because of it's quadratic nature. The model in this example will, depending on your hardware, take a couple of minutes to train.
 
 ## Serving the Scikit-learn Model
 
@@ -47,11 +47,15 @@ First up, we need to install MLServer.
 
 `pip install mlserver`
 
-/* Add install for scikit-learn server too */
+The additional runtimes are optional but make life really easy when serving models, we'll install the Scikit-Learn and XGBoost ones too
+
+`pip install mlserver-sklearn mlserver-xgboost`
+
+*You can find details on all of the inference runtimes [here](https://mlserver.readthedocs.io/en/latest/runtimes/index.html#included-inference-runtimes)*
 
 Once we've done that, all we need to do is add two configuration files:
 - `settings.json` - This contains the configuration for the server itself.
-- `model-settings.json` - As the name suggests, this file contains configuration for the model itself. 
+- `model-settings.json` - As the name suggests, this file contains configuration for the model we want to run. 
 
 For our `settings.json` file it's enough to just define single parameter:
 
@@ -86,11 +90,11 @@ Boom, we've now got our model running on a production-ready server locally. It's
 
 Now that our model is up and running. Let's send some requests to see it in action.
 
-To make predictions on our model, we need to send requests to the following URL:
+To make predictions on our model, we need to send a POST request to the following URL:
 
 `http://localhost:8080/v2/models/<MODEL_NAME>/versions/<VERSION>/infer`
 
-That means to access our scikit-learn model we need to replace the `MODEL_NAME` with `fashion-sklearn` and `VERSION` with `v1`. 
+That means to access our scikit-learn model that we trained earlier, we need to replace the `MODEL_NAME` with `fashion-sklearn` and `VERSION` with `v1`. 
 
 The code below shows how to import the test data, make a request to the model server and then compare the result with the actual label:
 
@@ -122,9 +126,7 @@ print(response.text)
 print(y_test.values)
 ```
 
-/* something about the inference request object and v2 serving protocol */
-
-When running the our test request code above we get the following response from MLServer:
+When running the `test.py` code above we get the following response from MLServer:
 
 ```json
 {
@@ -150,15 +152,15 @@ When running the our test request code above we get the following response from 
 
 You'll notice that MLServer has generated a request id and automatically added metadata about the model and version that was used to serve our request. Capturing this kind of metadata is super important once our model gets to production; it allows us to log every request for audit and troubleshooting purposes. 
 
-You might also notice that MLServer has returned an array for `outputs`. In our request we only sent one row of data but MLServer will also handle batch requests and return them together. You can even use a technique called [adaptive batching](link) to optimise the way multiple requests are handled in production environments. 
+You might also notice that MLServer has returned an array for `outputs`. In our request we only sent one row of data but MLServer also handles batch requests and returns them together. You can even use a technique called [adaptive batching](https://mlserver.readthedocs.io/en/latest/user-guide/adaptive-batching.html) to optimise the way multiple requests are handled in production environments. 
 
-In our example above, the model's prediction can be found in `outputs[0].data` which shows that the model has labeled this sample with the category `0` (The value 0 corresponds to the category `INSERT CATEGORY`). The true label for that sample was a `0` so the model got this prediction correct!
+In our example above, the model's prediction can be found in `outputs[0].data` which shows that the model has labeled this sample with the category `0` (The value 0 corresponds to the category `t-shirt/top`). The true label for that sample was a `0` too so the model got this prediction correct!
 
 ## Training the XGBoost Model
 
 Now that we've seen how to create and serve a single model using MLServer, let's take a look at how we'd handle multiple models trained in different frameworks. 
 
-We'll be using the same Fashion MNIST dataset but, this time, we'll train an [XGBoost](link) instead.
+We'll be using the same Fashion MNIST dataset but, this time, we'll train an [XGBoost](https://xgboost.readthedocs.io/en/stable/) model instead.
 
 ```python
 import pandas as pd
@@ -195,11 +197,11 @@ The code above, used to train the XGBoost model, is similar to the code we used 
 
 ## Serving Multiple Models
 
-One of the cool things about MLServer is that it supports [multi-model serving](link). This means that you don't have to create or run a new server for each ML model you want to deploy. Using the models we built above, we'll use this feature to serve them both at once.
+One of the cool things about MLServer is that it supports [multi-model serving](https://mlserver.readthedocs.io/en/latest/examples/mms/README.html). This means that you don't have to create or run a new server for each ML model you want to deploy. Using the models we built above, we'll use this feature to serve them both at once.
 
 When MLServer starts up, it will search the directory (and any subdirectories) for `model-settings.json` files. If you've got multiple `model-settings.json` files then it'll automatically serve them all. 
 
-*Note: you still only need a single `settings.json` file in the root directory (the one that contains server config)*
+*Note: you still only need a single `settings.json` (server config) file in the root directory*
 
 Here's a breakdown of my directory structure for reference:
 
@@ -237,7 +239,7 @@ We can now just run `mlserver start .` and it will start handling requests for b
 
 With both models now up and running on MLServer, we can use the samples from our test set to validate how accurate each of our models is. 
 
-The following code sends a batch request (containing the test set) to each of the models and then compares the predictions received to the true labels. Doing this across the whole test set gives us a reasonably good measure for each model's accuracy, which will be printed. 
+The following code sends a batch request (containing the full test set) to each of the models and then compares the predictions received to the true labels. Doing this across the whole test set gives us a reasonably good measure for each model's accuracy, which gets printed at the end.
 
 ```python
 import pandas as pd
@@ -287,8 +289,8 @@ Model Accuracy for fashion-sklearn: 0.864
 
 ## Summary
 
-Hopefully by now you've gained an understanding of how easy it is to serve models using [MLServer](link). For further info it's worth reading the [docs](link) and taking a look at the [examples for different frameworks](link). 
+Hopefully by now you've gained an understanding of how easy it is to serve models using [MLServer](https://mlserver.readthedocs.io/en/latest/index.html). For further info it's worth reading the [docs](https://mlserver.readthedocs.io/en/latest/index.html) and taking a look at the [examples for different frameworks](https://mlserver.readthedocs.io/en/latest/examples/index.html). 
 
-For [MLFlow](link) users you can now serve [models directly in MLFlow using MLServer](link) and if you're a [Kubernetes](link) user you should definitely check out [Seldon Core](link) - an open source tool that deploys models to Kubernetes (it uses MLServer under the covers). 
+For [MLFlow](https://mlflow.org/) users you can now serve [models directly in MLFlow using MLServer](https://www.mlflow.org/docs/latest/models.html#serving-with-mlserver-experimental) and if you're a [Kubernetes](https://kubernetes.io/) user you should definitely check out [Seldon Core](https://docs.seldon.io/projects/seldon-core/en/latest/index.html) - an open source tool that deploys models to Kubernetes (it uses MLServer under the covers). 
 
-All of the code from this example can be found [here](link).
+All of the code from this example can be found [here](https://github.com/edshee/mlserver-example).
